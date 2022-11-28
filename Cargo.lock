@@ -98,7 +98,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "compressed_set2"
+name = "compressed_set"
 version = "0.1.0"
 dependencies = [
  "criterion",
