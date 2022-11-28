@@ -43,7 +43,16 @@ impl CompressedSequence {
 
         if last_nr + step_size == item {
             let mut seq = self.seq.pop().unwrap().to_sequence();
-            seq.seq_add();
+
+            // Can't add more values to the given sequence item due to the u16 limit,
+            // so we need to add the sequence back to the list and create a new item
+            // for the value to push
+            if seq.seq_add().is_none() {
+                self.seq.push(seq);
+                self.seq.push(Item::new(item));
+                return;
+            }
+
             self.seq.push(seq);
             return;
         }
@@ -297,5 +306,15 @@ mod test {
         }
 
         assert_eq!(comp_seq.iter().collect::<Vec<_>>(), exp);
+    }
+
+    #[test]
+    fn test_big_sequence() {
+        let mut comp_seq = CompressedSequence::new(10);
+        for i in (0..1_000_000).step_by(10) {
+            comp_seq.push(i);
+        }
+
+        assert_eq!(comp_seq.len(), 100_000);
     }
 }
