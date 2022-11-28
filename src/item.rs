@@ -99,4 +99,20 @@ impl Item {
             Item::Sequence(_, cnt) => *cnt != u16::MAX,
         }
     }
+
+    /// Returns `true` if the item is [`Numbers`].
+    ///
+    /// [`Numbers`]: Item::Numbers
+    #[must_use]
+    pub(crate) fn is_numbers(&self) -> bool {
+        matches!(self, Self::Numbers(..))
+    }
+
+    /// Returns `true` if the item is [`Sequence`].
+    ///
+    /// [`Sequence`]: Item::Sequence
+    #[must_use]
+    pub(crate) fn is_sequence(&self) -> bool {
+        matches!(self, Self::Sequence(..))
+    }
 }

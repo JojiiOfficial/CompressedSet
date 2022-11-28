@@ -9,10 +9,45 @@ use std::{cmp::Ordering, mem::size_of, num::NonZeroU16};
 
 /// A compressed sequence of numbers somewhat near to each other
 /// with a frequently occurring step size
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CompressedSequence {
     step: u32,
     seq: Vec<Item>,
+}
+
+impl std::fmt::Debug for CompressedSequence {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let number_items = self.seq.iter().filter(|i| i.is_numbers()).count();
+        let seq_items = self.seq.iter().filter(|i| i.is_sequence()).count();
+
+        let half_numbers = self
+            .seq
+            .iter()
+            .filter(|i| i.is_numbers())
+            .filter(|i| {
+                if let Item::Numbers(_, b) = i {
+                    return b.is_none();
+                }
+                false
+            })
+            .count();
+
+        f.debug_struct("CompressedSequence")
+            .field("steps", &self.step)
+            .field("seq_len", &self.seq.len())
+            .field("> numbers", &number_items)
+            .field("> numbers (half)", &half_numbers)
+            .field("> sequences", &seq_items)
+            .field(
+                "> bytes size",
+                &(self.size_of() as f32 / 10240.0f32.powi(2)),
+            )
+            .field(
+                "> raw bytes size",
+                &((self.len() as f32 * 4.0) / 1024.0f32.powi(2)),
+            )
+            .finish()
+    }
 }
 
 impl CompressedSequence {
@@ -20,6 +55,18 @@ impl CompressedSequence {
     #[inline]
     pub fn new(step: u32) -> Self {
         Self { seq: vec![], step }
+    }
+
+    /// Creates a new compressed sequence from an iterator
+    pub fn from_iterator<I>(step: u32, iter: I) -> Self
+    where
+        I: IntoIterator<Item = u32>,
+    {
+        let mut vec: Vec<u32> = iter.into_iter().collect();
+        vec.sort_unstable();
+        let mut seq = Self::new(step);
+        seq.extend(vec);
+        seq
     }
 
     /// Pushes a new value to the sequence
@@ -247,6 +294,7 @@ mod test {
             }
         }
 
+        println!("{:#?}", comp_seq);
         assert_eq!(comp_seq.to_vec(), exp);
         assert_eq!(comp_seq.len(), exp.len());
 
