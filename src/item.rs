@@ -19,12 +19,10 @@ impl Item {
 
     /// Adds the next value to the sequence
     #[inline]
-    pub fn seq_add(&mut self) -> Option<()> {
+    pub fn seq_add(&mut self) {
         if let Self::Sequence(_, cnt) = self {
-            *cnt = cnt.checked_add(1)?;
+            *cnt += 1;
         }
-
-        Some(())
     }
 
     #[inline]
