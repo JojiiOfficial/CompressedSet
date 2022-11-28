@@ -98,7 +98,7 @@ impl Item {
     pub fn can_add(&self) -> bool {
         match self {
             Item::Numbers(_, b) => b.is_none(),
-            Item::Sequence(_, _) => true,
+            Item::Sequence(_, cnt) => *cnt != u16::MAX,
         }
     }
 }

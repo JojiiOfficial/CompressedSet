@@ -43,16 +43,7 @@ impl CompressedSequence {
 
         if last_nr + step_size == item {
             let mut seq = self.seq.pop().unwrap().to_sequence();
-
-            // Can't add more values to the given sequence item due to the u16 limit,
-            // so we need to add the sequence back to the list and create a new item
-            // for the value to push
-            if seq.seq_add().is_none() {
-                self.seq.push(seq);
-                self.seq.push(Item::new(item));
-                return;
-            }
-
+            seq.seq_add();
             self.seq.push(seq);
             return;
         }
