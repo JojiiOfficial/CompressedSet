@@ -1,5 +1,6 @@
 pub mod item;
 pub mod iter;
+pub mod utils;
 
 use item::Item;
 use iter::{CompSeqIter, CompSeqIterRef};
