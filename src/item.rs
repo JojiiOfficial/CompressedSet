@@ -42,20 +42,13 @@ impl Item {
     #[inline]
     pub fn at(&self, pos: usize, step_size: u32) -> Option<u32> {
         match self {
-            Item::Numbers(a, b) => {
-                if pos == 0 {
-                    Some(*a)
-                } else if pos == 1 {
-                    Some(a + (*b)?.get() as u32)
-                } else {
-                    None
-                }
-            }
+            Item::Numbers(a, b) => match pos {
+                0 => Some(*a),
+                1 => Some(a + (*b)?.get() as u32),
+                _ => None,
+            },
             Item::Sequence(start, cnt) => {
-                if pos > *cnt as usize {
-                    return None;
-                }
-                Some(start + (pos as u32 * step_size))
+                ((pos as u16) <= *cnt).then(|| start + (pos as u32 * step_size))
             }
         }
     }

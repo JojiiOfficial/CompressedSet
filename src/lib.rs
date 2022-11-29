@@ -1,7 +1,9 @@
+pub mod get_cache;
 pub mod item;
 pub mod iter;
 pub mod utils;
 
+use get_cache::GetCache;
 use item::Item;
 use iter::{CompSeqIter, CompSeqIterRef};
 use serde::{Deserialize, Serialize};
@@ -139,20 +141,53 @@ impl CompressedSequence {
 
     /// Gets an item at the given position
     pub fn get(&self, pos: usize) -> Option<u32> {
-        let mut item = &self.seq[0];
-        let mut i_len = item.len();
+        let mut item: Option<&Item> = None;
+        let mut i_len = 0;
 
-        for i in self.seq[1..].iter() {
-            if pos < i_len {
+        for i in self.seq.iter() {
+            let next_len = i_len + i.len();
+            if pos < next_len {
+                item = Some(i);
                 break;
             }
 
-            item = i;
-            i_len += i.len();
+            i_len = next_len;
         }
 
-        let i_pos = pos - (i_len - item.len());
-        Some(item.at(i_pos, self.step)?)
+        let item = item?;
+        Some(item.at(pos - i_len, self.step)?)
+    }
+
+    /// Gets an item at the given position using position cache for more efficient lookups
+    pub fn get_cached(&self, pos: usize, cache: &mut GetCache) -> Option<u32> {
+        let mut item: Option<&Item> = None;
+        let mut i_len = 0;
+
+        let mut vec_pos = 0;
+        let mut skip = 0;
+
+        if let Some((_, vec_pos, itemlen)) = cache.get(pos as u32) {
+            item = Some(&self.seq[vec_pos as usize]);
+            i_len = itemlen as usize;
+            skip = vec_pos as usize;
+        }
+
+        for (p, i) in self.seq.iter().enumerate().skip(skip) {
+            let next_len = i_len + i.len();
+            if pos < next_len {
+                vec_pos = p as u32;
+                item = Some(i);
+                break;
+            }
+
+            i_len = next_len;
+        }
+
+        let item = item?;
+        let item_value = item.at(pos - i_len, self.step)?;
+        cache.insert(pos as u32, vec_pos, i_len as u32);
+
+        Some(item_value)
     }
 
     /// Returns `true` if the set contains the given item using binary search
@@ -161,10 +196,12 @@ impl CompressedSequence {
         let mut left = 0;
         let mut right = size;
 
+        let mut pos_cache = GetCache::with_capacity(16);
+
         while left < right {
             let mid = left + size / 2;
 
-            let cmp = self.get(mid).unwrap().cmp(&item);
+            let cmp = self.get_cached(mid, &mut pos_cache).unwrap().cmp(&item);
 
             if cmp == Ordering::Less {
                 left = mid + 1;
@@ -355,5 +392,11 @@ mod test {
         }
 
         assert_eq!(comp_seq.len(), 100_000);
+    }
+
+    #[test]
+    fn test_get_smol() {
+        let comp_seq = CompressedSequence::new(10);
+        assert_eq!(comp_seq.get(0), None);
     }
 }

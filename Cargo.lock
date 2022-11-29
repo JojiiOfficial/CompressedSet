@@ -102,6 +102,7 @@ name = "compressed_set"
 version = "0.1.0"
 dependencies = [
  "criterion",
+ "intmap",
  "rand",
  "serde",
  "static_assertions",
@@ -232,6 +233,14 @@ checksum = "1885e79c1fc4b10f0e172c475f458b7f7b93061064d98c3293e98c5ba0c8b399"
 dependencies = [
  "autocfg",
  "hashbrown",
+]
+
+[[package]]
+name = "intmap"
+version = "0.7.1"
+source = "git+https://github.com/JojiiOfficial/rust-intmap#45ca8ef1d7aa53962e176a6629b0a6fc1d3116a0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
