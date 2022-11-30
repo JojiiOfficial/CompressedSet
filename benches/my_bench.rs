@@ -46,6 +46,14 @@ fn index_item_decode(c: &mut Criterion) {
             let _ = set.has_bin_search(black_box(333 as u32));
         });
     });
+
+    c.bench_function("bin_search_indexed", |b| {
+        let mut set = make_set();
+        set.update_index(50.0);
+        b.iter(|| {
+            let _ = set.has_bin_search(black_box(333 as u32));
+        });
+    });
 }
 
 criterion_group!(benches, index_item_decode);

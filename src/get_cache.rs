@@ -1,3 +1,6 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct GetCache {
     // (pos, vec_pos, len)
     cache: Vec<(u32, u32, u32)>,
@@ -32,6 +35,11 @@ impl GetCache {
             Err(tpos) => (tpos > 0).then(|| self.cache[tpos - 1]),
         }
     }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.cache.len()
+    }
 }
 
 #[cfg(test)]
@@ -62,8 +70,8 @@ mod test {
         get_cache.insert(5, 4, 6);
         get_cache.insert(90, 30, 6);
 
-        assert_eq!(get_cache.get(12), Some((10, 12, 6)));
-        assert_eq!(get_cache.get(13), Some((10, 12, 6)));
-        assert_eq!(get_cache.get(1239085), Some((90, 8, 6)));
+        assert_eq!(get_cache.get(12), Some((10, 7, 6)));
+        assert_eq!(get_cache.get(13), Some((10, 7, 6)));
+        assert_eq!(get_cache.get(1239085), Some((90, 30, 6)));
     }
 }

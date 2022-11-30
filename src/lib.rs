@@ -11,10 +11,11 @@ use std::{cmp::Ordering, mem::size_of, num::NonZeroU16};
 
 /// A compressed sequence of numbers somewhat near to each other
 /// with a frequently occurring step size
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct CompressedSequence {
     step: u32,
     seq: Vec<Item>,
+    index: GetCache,
 }
 
 impl std::fmt::Debug for CompressedSequence {
@@ -56,7 +57,11 @@ impl CompressedSequence {
     /// Create a new compressed sequence with a given step size
     #[inline]
     pub fn new(step: u32) -> Self {
-        Self { seq: vec![], step }
+        Self {
+            seq: vec![],
+            step,
+            index: GetCache::new(),
+        }
     }
 
     /// Creates a new compressed sequence from an iterator
@@ -139,23 +144,28 @@ impl CompressedSequence {
         out
     }
 
-    /// Gets an item at the given position
-    pub fn get(&self, pos: usize) -> Option<u32> {
-        let mut item: Option<&Item> = None;
-        let mut i_len = 0;
+    /// Updates the search index in the set. The rate is a value between 0% and 100% that indicates
+    /// how much percent of items should be cached
+    pub fn update_index(&mut self, rate: f64) {
+        if self.len() < 5 {
+            return;
+        }
+        let citem_count = ((self.len() as f64 * (rate / 100.0)).ceil() as usize)
+            .min(self.len())
+            .max(1);
+        let stepsize = self.len() / citem_count;
+        let mut index = GetCache::new();
 
-        for i in self.seq.iter() {
-            let next_len = i_len + i.len();
-            if pos < next_len {
-                item = Some(i);
-                break;
+        let mut pos = 0;
+        for (i, item) in self.seq.iter().enumerate() {
+            if i % stepsize == 0 {
+                index.insert(pos, i as u32, pos);
             }
 
-            i_len = next_len;
+            pos += item.len() as u32;
         }
 
-        let item = item?;
-        Some(item.at(pos - i_len, self.step)?)
+        self.index = index;
     }
 
     /// Gets an item at the given position using position cache for more efficient lookups
@@ -185,7 +195,36 @@ impl CompressedSequence {
 
         let item = item?;
         let item_value = item.at(pos - i_len, self.step)?;
+
         cache.insert(pos as u32, vec_pos, i_len as u32);
+
+        Some(item_value)
+    }
+    /// Gets an item at the given position using position cache for more efficient lookups
+    pub fn get(&self, pos: usize) -> Option<u32> {
+        let mut item: Option<&Item> = None;
+        let mut i_len = 0;
+
+        let mut skip = 0;
+
+        if let Some((_, vec_pos, itemlen)) = self.index.get(pos as u32) {
+            item = Some(&self.seq[vec_pos as usize]);
+            i_len = itemlen as usize;
+            skip = vec_pos as usize;
+        }
+
+        for i in self.seq.iter().skip(skip) {
+            let next_len = i_len + i.len();
+            if pos < next_len {
+                item = Some(i);
+                break;
+            }
+
+            i_len = next_len;
+        }
+
+        let item = item?;
+        let item_value = item.at(pos - i_len, self.step)?;
 
         Some(item_value)
     }
@@ -196,12 +235,14 @@ impl CompressedSequence {
         let mut left = 0;
         let mut right = size;
 
-        let mut pos_cache = GetCache::with_capacity(16);
+        //let mut pos_cache = GetCache::with_capacity(16);
 
         while left < right {
             let mid = left + size / 2;
 
-            let cmp = self.get_cached(mid, &mut pos_cache).unwrap().cmp(&item);
+            //let cmp = self.get_cached(mid, &mut pos_cache).unwrap().cmp(&item);
+            let cmp = self.get(mid).unwrap().cmp(&item);
+            //let cmp = self.get_item_cached(mid).unwrap().cmp_u32(item, self.step);
 
             if cmp == Ordering::Less {
                 left = mid + 1;
@@ -254,7 +295,8 @@ impl CompressedSequence {
     #[inline]
     pub fn size_of(&self) -> usize {
         let size_self = size_of::<Self>();
-        size_self + self.seq.len() * size_of::<Item>()
+        let index_size = size_of::<(u32, u32, u32)>() * self.index.len();
+        size_self + self.seq.len() * size_of::<Item>() + index_size
     }
 
     /// Returns an iterator over all items in the set
@@ -337,6 +379,33 @@ mod test {
 
         for (pos, i) in exp.iter().enumerate() {
             assert_eq!(comp_seq.get(pos), Some(*i));
+        }
+    }
+
+    #[test]
+    fn test_bin_search_indexed() {
+        let mut comp_seq = CompressedSequence::new(10);
+
+        let mut exp = vec![];
+
+        for (pos, i) in (0..=9120).step_by(10).enumerate() {
+            comp_seq.push(i);
+            exp.push(i);
+
+            if pos % 42 == 0 {
+                comp_seq.push(i + 1);
+                exp.push(i + 1);
+            }
+        }
+
+        assert_eq!(comp_seq.to_vec(), exp);
+        assert_eq!(comp_seq.len(), exp.len());
+
+        comp_seq.update_index(50.0);
+
+        for (pos, i) in exp.iter().enumerate() {
+            assert_eq!(comp_seq.get(pos), Some(*i));
+            assert!(comp_seq.has_bin_search(*i));
         }
     }
 
