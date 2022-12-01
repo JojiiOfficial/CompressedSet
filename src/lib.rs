@@ -200,6 +200,7 @@ impl CompressedSequence {
 
         Some(item_value)
     }
+
     /// Gets an item at the given position using position cache for more efficient lookups
     pub fn get(&self, pos: usize) -> Option<u32> {
         let mut item: Option<&Item> = None;
@@ -223,26 +224,32 @@ impl CompressedSequence {
             i_len = next_len;
         }
 
-        let item = item?;
-        let item_value = item.at(pos - i_len, self.step)?;
-
-        Some(item_value)
+        item?.at(pos - i_len, self.step)
     }
 
     /// Returns `true` if the set contains the given item using binary search
     pub fn has_bin_search(&self, item: u32) -> bool {
+        // Speedup for out of range values
+        if let Some(first) = self.first_value() {
+            if item < first {
+                return false;
+            }
+        }
+
+        if let Some(last) = self.last_item() {
+            if last.last_number(self.step) < item {
+                return false;
+            }
+        }
+
         let mut size = self.len();
         let mut left = 0;
         let mut right = size;
 
-        //let mut pos_cache = GetCache::with_capacity(16);
-
         while left < right {
             let mid = left + size / 2;
 
-            //let cmp = self.get_cached(mid, &mut pos_cache).unwrap().cmp(&item);
             let cmp = self.get(mid).unwrap().cmp(&item);
-            //let cmp = self.get_item_cached(mid).unwrap().cmp_u32(item, self.step);
 
             if cmp == Ordering::Less {
                 left = mid + 1;
@@ -313,6 +320,14 @@ impl CompressedSequence {
     #[inline]
     pub(crate) fn seq_mut(&mut self) -> &mut Vec<Item> {
         &mut self.seq
+    }
+
+    #[inline]
+    fn first_value(&self) -> Option<u32> {
+        Some(match self.seq.get(0)? {
+            Item::Numbers(a, _) => *a,
+            Item::Sequence(s, _) => *s,
+        })
     }
 
     #[inline]
